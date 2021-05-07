@@ -1,0 +1,12 @@
+warning: LF will be replaced by CRLF in src/app.css.
+The file will have its original line endings in your working directory
+[1mdiff --git a/src/app.css b/src/app.css[m
+[1mindex bd6213e..b5c61c9 100644[m
+[1m--- a/src/app.css[m
+[1m+++ b/src/app.css[m
+[36m@@ -1,3 +1,3 @@[m
+ @tailwind base;[m
+ @tailwind components;[m
+[31m-@tailwind utilities;[m
+\ No newline at end of file[m
+[32m+[m[32m@tailwind utilities;[m
