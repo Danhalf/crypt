@@ -1,29 +1,16 @@
 <template>
   <div class="container mx-auto flex flex-col items-center bg-gray-100 p-4">
-    <!-- <div
-      class="fixed w-100 h-100 opacity-80 bg-purple-800 inset-0 z-50 flex items-center justify-center"
-    >
-      <svg
-        class="animate-spin -ml-1 mr-3 h-12 w-12 text-white"
-        xmlns="http://www.w3.org/2000/svg"
-        fill="none"
-        viewBox="0 0 24 24"
-      >
-        <circle
-          class="opacity-25"
-          cx="12"
-          cy="12"
-          r="10"
-          stroke="currentColor"
-          stroke-width="4"
-        ></circle>
+    <div class="fixed w-100 h-100 opacity-80 bg-purple-800 inset-0 z-50 flex items-center justify-center" v-if="!appLoaded">
+      <svg class="animate-spin -ml-1 mr-3 h-12 w-12 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
         <path
           class="opacity-75"
           fill="currentColor"
           d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
         ></path>
       </svg>
-    </div> -->
+    </div>
+
     <div class="container">
       <section>
         <div class="flex">
@@ -33,6 +20,7 @@
               <input
                 v-model="ticker"
                 @keydown.enter="add"
+                @input="searchCoin"
                 type="text"
                 name="wallet"
                 id="wallet"
@@ -40,57 +28,22 @@
                 placeholder="Например DOGE"
               />
             </div>
-            <div class="flex bg-white shadow-md p-1 rounded-md shadow-md flex-wrap">
+            <div class="flex bg-white shadow-md p-1 rounded-md shadow-md flex-wrap" v-if="findCoins.length > 0">
               <span
                 class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer"
+                v-for="(coin, key) of findCoins"
+                :key="key"
                 @click="
                   {
-                    {
-                      (this.ticker = 'BTC'), add();
-                    }
+                    ticker = coin;
+                    add();
                   }
                 "
               >
-                BTC
-              </span>
-              <span
-                class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer"
-                @click="
-                  {
-                    {
-                      (this.ticker = 'DOGE'), add();
-                    }
-                  }
-                "
-              >
-                DOGE
-              </span>
-              <span
-                class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer"
-                @click="
-                  {
-                    {
-                      (this.ticker = 'BCH'), add();
-                    }
-                  }
-                "
-              >
-                BCH
-              </span>
-              <span
-                class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer"
-                @click="
-                  {
-                    {
-                      (this.ticker = 'CHD'), add();
-                    }
-                  }
-                "
-              >
-                CHD
+                {{ coin }}
               </span>
             </div>
-            <div class="text-sm text-red-600">Такой тикер уже добавлен</div>
+            <div v-if="alreadyTicker" class="text-sm text-red-600">Такой тикер уже добавлен</div>
           </div>
         </div>
         <button
@@ -117,9 +70,9 @@
             :class="{
               'border-dashed border-2': sel === t,
             }"
-            class="bg-white overflow-hidden shadow rounded-lg border-purple-800 border-solid cursor-pointer"
+            class="bg-white overflow-hidden shadow rounded-lg border-purple-800 border-solid cursor-pointer flex flex-col "
           >
-            <div class="px-4 py-5 sm:p-6 text-center">
+            <div class="px-4 py-5 sm:p-6 text-center flex-grow">
               <dt class="text-sm font-medium text-gray-500 truncate">{{ t.name }} - USD</dt>
               <dd class="mt-1 text-3xl font-semibold text-gray-900">{{ t.price }} USD</dd>
             </div>
@@ -180,18 +133,22 @@ export default {
     return {
       ticker: '',
       tickers: [],
+      alreadyTicker: false,
       sel: null,
       graph: [],
+      allCoins: [],
+      findCoins: [],
+      appLoaded: true,
     };
   },
   methods: {
     add() {
       const currentTicker = {
-        name: this.ticker,
+        name: this.ticker.toUpperCase(),
         price: '',
       };
-
-      this.tickers.push(currentTicker);
+      this.alreadyTicker = false;
+      this.tickers.some((elem) => elem.name == currentTicker.name) ? (this.alreadyTicker = true) : this.tickers.push(currentTicker);
       setInterval(async () => {
         const f = await fetch(
           `https://min-api.cryptocompare.com/data/price?fsym=${currentTicker.name}&tsyms=USD&api_key=046bb019f05540522ba573c299b93ce437555d72d2fabf2b52942a7af2f31132`
@@ -216,6 +173,30 @@ export default {
       const minValue = Math.min(...this.graph);
       return this.graph.map((price) => (minValue === maxValue ? 100 : 5 + ((price - minValue) * 95) / (maxValue - minValue)));
     },
+    searchCoin() {
+      const coincidence = this.allCoins;
+      const inpText = this.ticker.toUpperCase();
+      this.findCoins = [];
+      this.alreadyTicker = false;
+      for (let k in coincidence) {
+        if (k.includes(inpText)) {
+          if (this.findCoins.length < 4) this.findCoins.push(k);
+          if (k === inpText) {
+            this.findCoins.shift();
+            this.findCoins.unshift(k);
+          }
+        }
+      }
+    },
+  },
+
+  mounted() {
+    window.addEventListener('load', async () => {
+      // this.appLoaded = true;
+      const fetchCoins = await fetch('https://min-api.cryptocompare.com/data/all/coinlist?summary=true');
+      const data = await fetchCoins.json();
+      this.allCoins = data.Data;
+    });
   },
 };
 </script>
