@@ -76,6 +76,7 @@
           >
             Вперед
           </button>
+          <div class="font-extrabold mt-4">Страница <input type="text" class="w-10 h-6" v-model="page" /> из {{ maxPage }}</div>
           <div class="bg-gray-300 mt-4 h-10 rounded-lg flex gap-4 items-center justify-between px-4 w-1/5 font-bold">
             Фильтр: <input v-model="filter" class="bg-gray-200 h-full border-2 border-solid px-4 border-gray-300" />
           </div>
@@ -87,7 +88,7 @@
             :key="t.name"
             @click="select(t)"
             :class="{
-              'border-dashed border-2': sel === t,
+              'border-dashed border-2': selectedTicker === t,
             }"
             class="bg-white overflow-hidden shadow rounded-lg border-purple-800 border-solid cursor-pointer flex flex-col "
           >
@@ -112,12 +113,12 @@
         </dl>
         <hr class="w-full border-t border-gray-600 my-4" />
       </template>
-      <section v-if="sel" class="relative">
-        <h3 class="text-lg leading-6 font-medium text-gray-900 my-8">{{ sel.name }} - {{ sel.price }} USD</h3>
+      <section v-if="selectedTicker" class="relative">
+        <h3 class="text-lg leading-6 font-medium text-gray-900 my-8">{{ selectedTicker.name }} - {{ selectedTicker.price }} USD</h3>
         <div class="flex items-end border-gray-600 border-b border-l h-64">
           <div v-for="(bar, idx) in normalizedGraph" :key="idx" :style="{ height: `${bar}%` }" class="bg-purple-800 border w-8 custom-graph"></div>
         </div>
-        <button type="button" @click="sel = null" class="absolute top-0 right-0">
+        <button type="button" @click="selectedTicker = null" class="absolute top-0 right-0">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             xmlns:xlink="http://www.w3.org/1999/xlink"
@@ -142,6 +143,7 @@
         </button>
       </section>
     </div>
+    <span class="ml-auto">Всего тикеров: {{ filteredTickers.length }}</span>
   </div>
 </template>
 <script>
@@ -154,7 +156,7 @@ export default {
       ticker: '',
 
       tickers: [],
-      sel: null,
+      selectedTicker: null,
 
       alreadyTicker: false,
       graph: [],
@@ -163,6 +165,7 @@ export default {
       appLoaded: true,
       page: 1,
       tickersOnPage: 6,
+      updateFrequency: 5000,
     };
   },
 
@@ -187,6 +190,12 @@ export default {
   },
 
   computed: {
+    pageStateOptions() {
+      return {
+        filter: this.filter,
+        page: this.page,
+      };
+    },
     startIndex() {
       return (this.page - 1) * this.tickersOnPage;
     },
@@ -203,12 +212,22 @@ export default {
     },
 
     btnDisabled() {
-      return this.tickers.length <= this.endIndex;
+      return this.filteredTickers.length <= this.endIndex;
     },
+
     normalizedGraph() {
       const maxValue = Math.max(...this.graph);
       const minValue = Math.min(...this.graph);
+
+      if (maxValue === minValue) {
+        return this.graph.map(() => 50);
+      }
+
       return this.graph.map((price) => (minValue === maxValue ? 100 : 5 + ((price - minValue) * 95) / (maxValue - minValue)));
+    },
+
+    maxPage() {
+      return Math.ceil(this.filteredTickers.length / this.tickersOnPage);
     },
   },
 
@@ -220,9 +239,9 @@ export default {
         );
         const data = await f.json();
         this.tickers.find((t) => t.name === tickerName).price = data.USD > 1 ? data.USD.toFixed(2) : data.USD?.toPrecision(2);
-        if (this.sel?.name === tickerName) this.graph.push(data.USD);
+        if (this.selectedTicker?.name === tickerName) this.graph.push(data.USD);
         if (this.graph.length > 80) this.graph.shift();
-      }, 3000);
+      }, this.updateFrequency);
     },
 
     add() {
@@ -232,20 +251,17 @@ export default {
         price: '',
       };
       this.alreadyTicker = false;
-      this.tickers.some((elem) => elem.name == currentTicker.name) ? (this.alreadyTicker = true) : this.tickers.push(currentTicker);
+      this.tickers.some((elem) => elem.name == currentTicker.name) ? (this.alreadyTicker = true) : (this.tickers = [...this.tickers, currentTicker]);
       this.subscribeToUpdates(currentTicker.name);
-      localStorage.setItem('cryptonomicon-list', JSON.stringify(this.tickers));
-      this.ticker = '';
-      this.filter = '';
     },
 
     select(ticker) {
-      (this.sel = ticker), (this.graph = []);
+      this.selectedTicker = ticker;
     },
 
     handleDelete(tickerToRemove) {
       this.tickers = this.tickers.filter((t) => t !== tickerToRemove);
-      localStorage.setItem('cryptonomicon-list', JSON.stringify(this.tickers));
+      if (this.selectedTicker === tickerToRemove) this.selectedTicker = null;
     },
 
     searchCoin() {
@@ -275,12 +291,26 @@ export default {
   },
 
   watch: {
+    selectedTicker() {
+      this.graph = [];
+    },
+
+    tickers() {
+      localStorage.setItem('cryptonomicon-list', JSON.stringify(this.tickers));
+      this.ticker = '';
+      this.filter = '';
+    },
+
     filter() {
       this.page = 1;
-      window.history.pushState(null, document.title, `${window.location.pathname}?filter=${this.filter}&page=${this.page}`);
     },
-    page() {
-      window.history.pushState(null, document.title, `${window.location.pathname}?filter=${this.filter}&page=${this.page}`);
+
+    pageStateOptions(val) {
+      window.history.pushState(null, document.title, `${window.location.pathname}?filter=${val.filter}&page=${val.page}`);
+    },
+
+    paginatedTickers() {
+      if (this.paginatedTickers.length === 0 && this.page > 1) this.page--;
     },
   },
 };
